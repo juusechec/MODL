@@ -39,25 +39,35 @@ Strong static type system with:
 
 ## Quick Start
 
-See the [SPECIFICATION.md](SPECIFICATION.md) for complete language reference.
+**New to MODL?** → [GETTING_STARTED.md](GETTING_STARTED.md) - 10-minute tutorial
 
-Explore [examples/](examples/) for practical demonstrations of each construct.
+**Need quick syntax reference?** → [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Cheat sheet
+
+**Want complete details?** → [SPECIFICATION.md](SPECIFICATION.md) - Full specification
+
+**See examples?** → [examples/](examples/) - Practical demonstrations
 
 ## Repository Structure
 
 ```
 MODL/
-├── SPECIFICATION.md      # Complete language specification
-├── ARCHITECTURE.md       # Design rationale and theory
-├── examples/            # Example MODL programs
-│   ├── 01_entity.modl
-│   ├── 02_relation.modl
-│   ├── 03_constraint.modl
-│   ├── 04_transform.modl
-│   ├── 05_pattern.modl
-│   ├── 06_composition.modl
-│   └── 07_query.modl
-└── README.md           # This file
+├── README.md                # This file - Start here!
+├── GETTING_STARTED.md       # 10-minute tutorial
+├── QUICK_REFERENCE.md       # Syntax cheat sheet
+├── SPECIFICATION.md         # Complete language specification
+├── ARCHITECTURE.md          # Design rationale and theory
+├── DESIGN_PRINCIPLES.md     # How principles map to constructs
+├── COMPARISON.md            # MODL vs other languages
+└── examples/               # Example MODL programs
+    ├── 01_entity.modl
+    ├── 02_relation.modl
+    ├── 03_constraint.modl
+    ├── 04_transform.modl
+    ├── 05_pattern.modl
+    ├── 06_composition.modl
+    ├── 07_query.modl
+    ├── complete_example.modl
+    └── README.md
 ```
 
 ## Key Features
@@ -76,6 +86,21 @@ MODL combines insights from:
 - Miller (1956) - Cognitive load limits (7±2)
 - Vaswani et al. (2017) - Transformer architecture
 - Martin-Löf (1975) - Type theory
+
+## Documentation
+
+### For Beginners
+- [GETTING_STARTED.md](GETTING_STARTED.md) - Learn MODL in 10 minutes
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Syntax cheat sheet
+- [examples/](examples/) - Practical code examples
+
+### For Developers
+- [SPECIFICATION.md](SPECIFICATION.md) - Complete language specification
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Design rationale and theory
+- [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md) - Principle-to-construct mapping
+
+### For Comparison
+- [COMPARISON.md](COMPARISON.md) - MODL vs UML, SQL, OWL, Alloy, etc.
 
 ## License
 
