@@ -230,6 +230,8 @@ Type Email = String where matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2
 Type PositiveInt = Integer where value > 0
 ```
 
+**Nota:** La sintaxis `where` en definiciones de tipo es conceptual. La gramática formal se puede extender para soportar restricciones en tipos definidos por usuario.
+
 ---
 
 ## Reglas de Verificación de Tipos

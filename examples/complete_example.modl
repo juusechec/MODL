@@ -99,7 +99,7 @@ Constraint ActiveProject: Project {
 }
 
 Constraint FutureDueDate: Project {
-  condition: deadline >= currentDate()
+  condition: deadline > currentDate()
   message: "Project deadline must be in the future"
 }
 
