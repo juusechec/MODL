@@ -1,0 +1,53 @@
+# Example 4: Transform Construction
+# Demonstrates pure transformations on entities
+
+# Promote an employee
+Transform Promote: Employee => Employee {
+  operation: {
+    salary = salary * 1.15
+    level = level + 1
+    lastPromotion = currentDate()
+  }
+}
+
+# Apply discount to product
+Transform ApplyDiscount: Product => Product {
+  operation: {
+    originalPrice = price
+    price = price * 0.85
+    onSale = true
+  }
+}
+
+# Update user profile
+Transform UpdateProfile: User => User {
+  operation: {
+    lastModified = currentDate()
+    version = version + 1
+  }
+}
+
+# Calculate total with tax
+Transform AddTax: Order => Order {
+  operation: {
+    subtotal = calculateSubtotal()
+    tax = subtotal * 0.08
+    total = subtotal + tax
+  }
+}
+
+# Normalize string data
+Transform NormalizeData: Entity => Entity {
+  operation: {
+    name = name.trim().toLowerCase()
+    email = email.trim().toLowerCase()
+  }
+}
+
+# Age entity (increment age by 1 year)
+Transform AgeOneYear: Person => Person {
+  operation: {
+    age = age + 1
+    lastBirthday = currentDate()
+  }
+}

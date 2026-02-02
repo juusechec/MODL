@@ -1,0 +1,350 @@
+# Complete MODL Example: Employee Management System
+# This example demonstrates all 7 core constructs working together
+
+# ============================================
+# 1. ENTITIES - Define the domain objects
+# ============================================
+
+Entity Employee: Person {
+  id: Integer = 1001
+  name: String = "Alice Johnson"
+  email: String = "alice@company.com"
+  salary: Float = 85000.0
+  level: Integer = 3
+  department: String = "Engineering"
+  hireDate: Date = "2020-01-15"
+  active: Boolean = true
+}
+
+Entity Department: Organization {
+  id: Integer = 100
+  name: String = "Engineering"
+  budget: Float = 5000000.0
+  location: String = "Building A"
+  headCount: Integer = 25
+}
+
+Entity Project: Work {
+  id: Integer = 2001
+  name: String = "MODL Development"
+  status: String = "Active"
+  deadline: Date = "2026-12-31"
+  budget: Float = 250000.0
+}
+
+# ============================================
+# 2. RELATIONS - Define connections
+# ============================================
+
+Relation WorksIn: Employee -> Department {
+  type: Employment
+  properties: {
+    startDate: "2020-01-15"
+    role: "Software Engineer"
+  }
+}
+
+Relation AssignedTo: Employee -> Project {
+  type: Assignment
+  properties: {
+    assignedDate: "2026-01-01"
+    hoursPerWeek: 40
+    role: "Developer"
+  }
+}
+
+Relation Manages: Employee -> Department {
+  type: Management
+  properties: {
+    since: "2021-06-01"
+    authority: "Full"
+  }
+}
+
+Relation Mentors: Employee -> Employee {
+  type: Mentorship
+  properties: {
+    startDate: "2025-03-01"
+    meetingFrequency: "Weekly"
+  }
+}
+
+# ============================================
+# 3. CONSTRAINTS - Define validation rules
+# ============================================
+
+Constraint ValidSalary: Employee {
+  condition: salary > 0.0 && salary <= 500000.0
+  message: "Salary must be between 0 and 500,000"
+}
+
+Constraint ValidLevel: Employee {
+  condition: level >= 1 && level <= 10
+  message: "Employee level must be between 1 and 10"
+}
+
+Constraint ValidEmail: Employee {
+  condition: email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+  message: "Invalid email format"
+}
+
+Constraint PositiveBudget: Department {
+  condition: budget > 0.0
+  message: "Department budget must be positive"
+}
+
+Constraint ActiveProject: Project {
+  condition: status in ["Active", "Planned", "Completed"]
+  message: "Invalid project status"
+}
+
+Constraint FutureDueDate: Project {
+  condition: deadline >= currentDate()
+  message: "Project deadline must be in the future"
+}
+
+# ============================================
+# 4. TRANSFORMS - Define operations
+# ============================================
+
+Transform PromoteEmployee: Employee => Employee {
+  operation: {
+    level = level + 1
+    salary = salary * 1.15
+    lastPromotion = currentDate()
+  }
+}
+
+Transform GiveRaise: Employee => Employee {
+  operation: {
+    salary = salary * 1.05
+    lastSalaryChange = currentDate()
+  }
+}
+
+Transform CompleteProject: Project => Project {
+  operation: {
+    status = "Completed"
+    completionDate = currentDate()
+  }
+}
+
+Transform IncreaseProjectBudget: Project => Project {
+  operation: {
+    budget = budget * 1.20
+    lastBudgetChange = currentDate()
+  }
+}
+
+Transform DeactivateEmployee: Employee => Employee {
+  operation: {
+    active = false
+    deactivationDate = currentDate()
+  }
+}
+
+# ============================================
+# 5. PATTERNS - Define reusable structures
+# ============================================
+
+Pattern OrganizationalHierarchy {
+  structure: {
+    manager: Employee
+    reports: List<Employee>
+  }
+  matches: reports.all(emp => Relation(emp -> manager).type == "ReportsTo")
+}
+
+Pattern ProjectTeam {
+  structure: {
+    project: Project
+    members: List<Employee>
+    lead: Employee
+  }
+  matches: members.all(emp => Relation(emp -> project).type == "AssignedTo") 
+          && Relation(lead -> project).properties.role == "Lead"
+}
+
+Pattern MentorshipProgram {
+  structure: {
+    mentor: Employee
+    mentees: List<Employee>
+  }
+  matches: mentees.all(e => Relation(mentor -> e).type == "Mentorship")
+          && mentor.level >= 5
+}
+
+Pattern DepartmentStructure {
+  structure: {
+    department: Department
+    employees: List<Employee>
+    manager: Employee
+  }
+  matches: employees.all(e => Relation(e -> department).type == "WorksIn")
+          && Relation(manager -> department).type == "Manages"
+}
+
+# ============================================
+# 6. COMPOSITIONS - Build complex systems
+# ============================================
+
+Composition HRSystem {
+  components: [
+    Entity(Employee: Person)
+    Entity(Department: Organization)
+    Relation(WorksIn: Employee -> Department)
+    Constraint(ValidSalary: Employee)
+    Transform(PromoteEmployee: Employee => Employee)
+    Transform(GiveRaise: Employee => Employee)
+    Pattern(OrganizationalHierarchy)
+  ]
+  interface: {
+    hireEmployee: (Employee, Department) => Employee
+    promoteEmployee: (Employee) => Employee
+    transferEmployee: (Employee, Department) => Employee
+    terminateEmployee: (Employee) => Boolean
+    calculatePayroll: (Department) => Float
+    getEmployeesByLevel: (Integer) => List<Employee>
+  }
+}
+
+Composition ProjectManagement {
+  components: [
+    Entity(Project: Work)
+    Entity(Employee: Person)
+    Relation(AssignedTo: Employee -> Project)
+    Constraint(ActiveProject: Project)
+    Transform(CompleteProject: Project => Project)
+    Transform(IncreaseProjectBudget: Project => Project)
+    Pattern(ProjectTeam)
+  ]
+  interface: {
+    createProject: (String, Float, Date) => Project
+    assignEmployee: (Employee, Project) => Boolean
+    updateProjectStatus: (Project, String) => Project
+    calculateProjectCost: (Project) => Float
+    getProjectProgress: (Project) => Float
+  }
+}
+
+Composition CompanyManagement {
+  components: [
+    Composition(HRSystem)
+    Composition(ProjectManagement)
+    Entity(Department: Organization)
+    Constraint(PositiveBudget: Department)
+    Pattern(DepartmentStructure)
+    Pattern(MentorshipProgram)
+  ]
+  interface: {
+    getDepartmentHeadcount: (Department) => Integer
+    getDepartmentProjects: (Department) => List<Project>
+    calculateDepartmentCost: (Department) => Float
+    optimizeResourceAllocation: () => Map<Project, List<Employee>>
+    generatePerformanceReport: (Employee) => Report
+  }
+}
+
+# ============================================
+# 7. QUERIES - Retrieve and analyze data
+# ============================================
+
+Query SeniorEngineers: List<Employee> {
+  from: Employee
+  where: level >= 5 && department == "Engineering" && active == true
+  select: { id, name, level, salary }
+}
+
+Query HighEarners: List<Employee> {
+  from: Employee
+  where: salary > 100000.0
+  orderBy: salary desc
+  select: { name, salary, department }
+}
+
+Query ActiveProjects: List<Project> {
+  from: Project
+  where: status == "Active"
+  select: *
+}
+
+Query EngineeringBudget: Float {
+  from: Department
+  where: name == "Engineering"
+  select: sum(budget)
+}
+
+Query EmployeesByDepartment: List<DepartmentStats> {
+  from: Employee
+  groupBy: department
+  select: {
+    department: department
+    count: count()
+    avgSalary: avg(salary)
+    avgLevel: avg(level)
+    totalCost: sum(salary)
+  }
+}
+
+Query ProjectsOverBudget: List<Project> {
+  from: Project
+  where: actualCost > budget
+  select: { name, budget, actualCost, overrun: actualCost - budget }
+}
+
+Query MentorsAndMentees: List<MentorPair> {
+  from: Employee as mentor
+  where: exists(Relation(mentor -> mentee) where type == "Mentorship")
+  select: { 
+    mentorName: mentor.name
+    mentorLevel: mentor.level
+    mentees: Relation(mentor -> mentee).target.name 
+  }
+}
+
+Query EmployeesNearingPromotion: List<Employee> {
+  from: Employee
+  where: level < 10 
+         && salary >= levelMinSalary(level + 1) * 0.9
+         && tenure > 2
+  select: { name, level, salary, tenure }
+}
+
+# ============================================
+# DEMONSTRATION OF COMPOSITIONALITY
+# ============================================
+
+# Complex query combining multiple concepts
+Query HighPerformingTeams: List<TeamMetrics> {
+  from: Project
+  where: status == "Completed" 
+         && actualCost <= budget
+         && completionDate <= deadline
+  select: {
+    projectName: name
+    teamSize: count(Relation(* -> Project).source)
+    avgTeamLevel: avg(Relation(* -> Project).source.level)
+    efficiency: budget / actualCost
+    onTimeCompletion: deadline - completionDate
+  }
+  orderBy: efficiency desc
+  limit: 10
+}
+
+# Semantic composition example
+# The meaning of this query is derived from:
+# - Project entity definition
+# - AssignedTo relation definition  
+# - Project constraint definitions
+# - Compositional query semantics
+
+# ============================================
+# END OF EXAMPLE
+# ============================================
+
+# This example demonstrates:
+# ✓ All 7 constructs in use
+# ✓ Semantic compositionality (meanings combine predictably)
+# ✓ Type safety (all operations are type-checked)
+# ✓ Cognitive economy (each construct is distinct and learnable)
+# ✓ Embedding-friendly (structures map to vectors)

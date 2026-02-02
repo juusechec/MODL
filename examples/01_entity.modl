@@ -1,0 +1,29 @@
+# Example 1: Entity Construction
+# Demonstrates basic entity definition with typed attributes
+
+Entity User: Person {
+  id: Integer = 1001
+  name: String = "Alice Johnson"
+  email: String = "alice@example.com"
+  age: Integer = 30
+  active: Boolean = true
+  registered: Date = "2020-01-15"
+}
+
+Entity Product: Item {
+  id: Integer = 5001
+  name: String = "Laptop"
+  price: Float = 999.99
+  category: String = "Electronics"
+  inStock: Boolean = true
+  tags: List<String> = ["computer", "portable", "work"]
+}
+
+# Type-safe entity with constraint-compatible types
+Entity Account: BankAccount {
+  accountNumber: String = "ACC-123456"
+  balance: Float = 5000.50
+  currency: String = "USD"
+  owner: String = "Alice Johnson"
+  overdraftLimit: Float = 500.0
+}

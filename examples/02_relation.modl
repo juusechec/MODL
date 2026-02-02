@@ -1,0 +1,41 @@
+# Example 2: Relation Construction
+# Demonstrates relationships between entities
+
+# Employment relationship
+Relation WorksAt: User -> Company {
+  type: Employment
+  properties: {
+    since: "2020-01-01"
+    position: "Senior Engineer"
+    department: "Engineering"
+    employmentType: "Full-time"
+  }
+}
+
+# Ownership relationship
+Relation Owns: User -> Product {
+  type: Ownership
+  properties: {
+    purchaseDate: "2023-05-10"
+    warranty: "2 years"
+    price: 999.99
+  }
+}
+
+# Social relationship (bidirectional)
+Relation FriendsWith: User -> User {
+  type: SocialConnection
+  properties: {
+    since: "2015-03-20"
+    connectionStrength: "strong"
+  }
+}
+
+# Hierarchical relationship
+Relation ManagedBy: Employee -> Manager {
+  type: Hierarchy
+  properties: {
+    effectiveDate: "2021-06-01"
+    reportingLevel: 1
+  }
+}

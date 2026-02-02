@@ -1,0 +1,61 @@
+# Example 5: Pattern Construction
+# Demonstrates reusable structural patterns
+
+# Tree/Hierarchy pattern
+Pattern Hierarchy {
+  structure: {
+    parent: Entity
+    children: List<Entity>
+  }
+  matches: Relation(parent -> children) && children.all(child => child.parentId == parent.id)
+}
+
+# Observer pattern for reactive systems
+Pattern Observable {
+  structure: {
+    subject: Entity
+    observers: List<Entity>
+  }
+  matches: observers.all(obs => Relation(subject -> obs).type == "Observes")
+}
+
+# Aggregate pattern for DDD
+Pattern Aggregate {
+  structure: {
+    root: Entity
+    entities: List<Entity>
+    invariants: List<Constraint>
+  }
+  matches: entities.all(e => e.belongsTo(root)) && invariants.all(c => c.appliesTo(root))
+}
+
+# Factory pattern
+Pattern Factory {
+  structure: {
+    creator: Transform
+    product: Type
+  }
+  matches: creator.outputType == product
+}
+
+# Repository pattern
+Pattern Repository {
+  structure: {
+    entityType: Type
+    operations: {
+      find: Query
+      save: Transform
+      delete: Transform
+    }
+  }
+  matches: operations.find.resultType == List<entityType>
+}
+
+# Graph pattern
+Pattern Graph {
+  structure: {
+    nodes: Set<Entity>
+    edges: List<Relation>
+  }
+  matches: edges.all(e => nodes.contains(e.source) && nodes.contains(e.target))
+}

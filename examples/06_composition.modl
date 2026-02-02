@@ -1,0 +1,77 @@
+# Example 6: Composition Construction
+# Demonstrates building complex systems from components
+
+# Department composition
+Composition Department {
+  components: [
+    Entity(Manager: Person)
+    List<Entity(Employee: Person)>
+    Relation(ReportsTo: Employee -> Manager)
+    Constraint(TeamSize: Employee.count() <= 50)
+  ]
+  interface: {
+    getMembers: () => List<Employee>
+    getManager: () => Manager
+    addEmployee: (Employee) => Department
+    removeEmployee: (Employee) => Department
+    calculatePayroll: () => Float
+  }
+}
+
+# Order processing system
+Composition OrderProcessing {
+  components: [
+    Entity(Order: Transaction)
+    Entity(Customer: Person)
+    Entity(Product: Item)
+    Relation(Places: Customer -> Order)
+    Relation(Contains: Order -> Product)
+    Transform(ProcessPayment: Order => Order)
+    Transform(ShipOrder: Order => Order)
+    Constraint(ValidOrder: Order.total > 0)
+  ]
+  interface: {
+    createOrder: (Customer, List<Product>) => Order
+    processOrder: (Order) => Order
+    getOrderStatus: (Order) => String
+    cancelOrder: (Order) => Boolean
+  }
+}
+
+# Authentication system
+Composition AuthSystem {
+  components: [
+    Entity(User: Account)
+    Entity(Session: Token)
+    Relation(AuthenticatedAs: Session -> User)
+    Transform(Login: Credentials => Session)
+    Transform(Logout: Session => Unit)
+    Constraint(ValidSession: Session.expiresAt > currentTime())
+  ]
+  interface: {
+    authenticate: (String, String) => Option<Session>
+    validateSession: (Session) => Boolean
+    refreshSession: (Session) => Session
+    logout: (Session) => Unit
+  }
+}
+
+# Content management system
+Composition CMS {
+  components: [
+    Entity(Content: Document)
+    Entity(Author: User)
+    Entity(Category: Tag)
+    Relation(WrittenBy: Content -> Author)
+    Relation(CategorizedAs: Content -> Category)
+    Query(RecentContent: List<Content>)
+    Transform(Publish: Content => Content)
+    Pattern(Hierarchy)
+  ]
+  interface: {
+    createContent: (Author, String) => Content
+    publishContent: (Content) => Content
+    searchContent: (String) => List<Content>
+    getContentByCategory: (Category) => List<Content>
+  }
+}

@@ -1,0 +1,38 @@
+# Example 3: Constraint Construction
+# Demonstrates validation rules and invariants
+
+# Age constraint for person entities
+Constraint ValidAge: Person {
+  condition: age >= 0 && age <= 150
+  message: "Age must be between 0 and 150 years"
+}
+
+# Price constraint for products
+Constraint PositivePrice: Product {
+  condition: price > 0.0
+  message: "Product price must be positive"
+}
+
+# Email format constraint
+Constraint ValidEmail: User {
+  condition: email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+  message: "Invalid email format"
+}
+
+# Account balance constraint
+Constraint SufficientFunds: BankAccount {
+  condition: balance >= -overdraftLimit
+  message: "Account balance cannot exceed overdraft limit"
+}
+
+# Employment date constraint
+Constraint ValidEmploymentDate: Employment {
+  condition: startDate <= currentDate()
+  message: "Employment start date cannot be in the future"
+}
+
+# Referential integrity constraint
+Constraint ValidReference: Relation {
+  condition: source.exists() && target.exists()
+  message: "Both source and target entities must exist"
+}

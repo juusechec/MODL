@@ -1,0 +1,65 @@
+# Example 7: Query Construction
+# Demonstrates declarative data retrieval
+
+# Find senior engineers
+Query SeniorEngineers: List<Employee> {
+  from: Employee
+  where: level >= 5 && department == "Engineering"
+  select: *
+}
+
+# Find products on sale
+Query SaleProducts: List<Product> {
+  from: Product
+  where: onSale == true && price < 100.0
+  select: { name, price, category }
+}
+
+# Find active users registered in last year
+Query RecentActiveUsers: List<User> {
+  from: User
+  where: active == true && registered > dateSubtract(currentDate(), years: 1)
+  select: { id, name, email, registered }
+}
+
+# Find high-value customers
+Query HighValueCustomers: List<Customer> {
+  from: Customer
+  where: totalPurchases > 10000.0 && loyaltyTier == "Gold"
+  select: { id, name, totalPurchases, loyaltyTier }
+}
+
+# Find overdue invoices
+Query OverdueInvoices: List<Invoice> {
+  from: Invoice
+  where: dueDate < currentDate() && status == "Pending"
+  select: { id, customer, amount, dueDate }
+}
+
+# Complex join query - employees and their managers
+Query EmployeeManagerPairs: List<Pair<Employee, Manager>> {
+  from: Employee as e
+  where: exists(Relation(e -> m) where type == "ReportsTo")
+  select: { employee: e, manager: m }
+}
+
+# Aggregate query - department sizes
+Query DepartmentSizes: List<DepartmentStats> {
+  from: Employee
+  groupBy: department
+  select: {
+    department: department
+    count: count()
+    avgSalary: avg(salary)
+    maxLevel: max(level)
+  }
+}
+
+# Similarity search (embedding-based)
+Query SimilarProducts: List<Product> {
+  from: Product
+  where: cosineSimilarity(embedding, targetProduct.embedding) > 0.8
+  orderBy: cosineSimilarity(embedding, targetProduct.embedding) desc
+  limit: 10
+  select: { name, category, similarity }
+}
