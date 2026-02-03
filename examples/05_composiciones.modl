@@ -1,0 +1,265 @@
+# Example 05: Composiciones (Compositions/Processes)
+
+# Compositions define complex processes as a sequence of steps.
+# Syntax: proceso[Nombre]: entrada: ... salida: ... pasos: ...
+
+# ===== SIMPLE PROCESS =====
+
+proceso[ValidarUsuario]:
+  entrada: @usuario
+  salida: bool
+  pasos:
+    1. verificar @usuario.activo -> activo
+    2. verificar @usuario.verificado -> verificado
+    3. retornar (activo AND verificado)
+
+# ===== PAYMENT PROCESSING =====
+
+proceso[ProcesarPago]:
+  entrada: @pedido, @metodoPago
+  salida: @transaccion | error
+  pasos:
+    1. validar(@metodoPago) -> ok | error["metodo_invalido"]
+    2. si error: lanzar(error)
+    3. verificar(@metodoPago.saldo >= @pedido.total) -> ok | error["saldo_insuficiente"]
+    4. si error: lanzar(error)
+    5. crear @transaccion
+    6. @transaccion.monto := @pedido.total
+    7. @transaccion.estado := "pendiente"
+    8. ejecutar_cargo(@metodoPago, @pedido.total) -> exito | fallo
+    9. si exito:
+         @transaccion.estado := "completado"
+         @transaccion.referencia := generar_referencia()
+         retornar @transaccion
+    10. si fallo:
+         @transaccion.estado := "fallido"
+         lanzar(error["pago_rechazado"])
+
+# ===== ORDER COMPLETION =====
+
+proceso[CompletarCompra]:
+  entrada: @usuario, @carrito, @metodoPago, @direccion
+  salida: @pedido | error
+  pasos:
+    1. validar(@usuario.activo) -> ok | error["usuario_inactivo"]
+    2. validar(cuenta(@carrito.productos) > 0) -> ok | error["carrito_vacio"]
+    3. validar(@metodoPago.valido) -> ok | error["metodo_invalido"]
+    4. si algún error: lanzar(error)
+    
+    5. verificar_stock(@carrito.productos) -> ok | error["sin_stock"]
+    6. si error: lanzar(error)
+    
+    7. crear @pedido
+    8. @usuario.crea(@pedido)
+    9. @pedido.total := @carrito.total
+    10. @pedido.direccionEnvio := @direccion
+    
+    11. para cada @producto en @carrito.productos:
+          @pedido --contiene--> @producto
+          @producto.stock := @producto.stock - 1
+    
+    12. ProcesarPago(@pedido, @metodoPago) -> @transaccion | error
+    13. si error:
+          revertir_stock(@pedido.productos)
+          @pedido.estado := "fallido"
+          lanzar(error)
+    
+    14. @pedido.estado := "completado"
+    15. @carrito.vaciar()
+    16. enviar_confirmacion(@usuario, @pedido)
+    17. retornar @pedido
+
+# ===== PRODUCT SEARCH =====
+
+proceso[BuscarProductos]:
+  entrada: criterios: texto, categoria: texto, precioMin: número, precioMax: número
+  salida: lista[@producto]
+  pasos:
+    1. @productos := obtener_todos_productos()
+    2. si criterios != "":
+         @productos := @productos.filtra(p -> p.nombre.contiene(criterios))
+    3. si categoria != "":
+         @productos := @productos.filtra(p -> p.categoria == categoria)
+    4. si precioMin > 0:
+         @productos := @productos.filtra(p -> p.precio >= precioMin)
+    5. si precioMax > 0:
+         @productos := @productos.filtra(p -> p.precio <= precioMax)
+    6. @productos := @productos.filtra(p -> p.stock > 0)
+    7. ordenar @productos por relevancia
+    8. retornar @productos
+
+# ===== USER REGISTRATION =====
+
+proceso[RegistrarUsuario]:
+  entrada: @email, @password, @nombre
+  salida: @usuario | error
+  pasos:
+    1. validar_email(@email) -> ok | error["email_invalido"]
+    2. validar_password(@password) -> ok | error["password_debil"]
+    3. si algún error: lanzar(error)
+    
+    4. verificar(NOT existe(@usuario[email == @email])) -> ok | error["email_existe"]
+    5. si error: lanzar(error)
+    
+    6. crear @usuario
+    7. @usuario.email := @email
+    8. @usuario.password := hash(@password)
+    9. @usuario.nombre := @nombre
+    10. @usuario.activo := false
+    11. @usuario.verificado := false
+    12. @usuario.fechaRegistro := ahora()
+    
+    13. @token := generar_token_verificacion(@usuario)
+    14. enviar_email_verificacion(@email, @token)
+    
+    15. retornar @usuario
+
+# ===== ORDER FULFILLMENT =====
+
+proceso[CumplirPedido]:
+  entrada: @pedido
+  salida: @envio | error
+  pasos:
+    1. verificar(@pedido.estado == "completado") -> ok | error["pedido_no_completado"]
+    2. si error: lanzar(error)
+    
+    3. verificar_inventario(@pedido.productos) -> ok | error["inventario_insuficiente"]
+    4. si error: lanzar(error)
+    
+    5. crear @paquete
+    6. para cada @producto en @pedido.productos:
+         @paquete --contiene--> @producto
+         marcar_empaquetado(@producto)
+    
+    7. crear @envio
+    8. @envio.destino := @pedido.direccionEnvio
+    9. @envio.fecha := ahora()
+    10. @envio.estado := "preparando"
+    
+    11. asignar_transportista(@envio) -> @transportista | error
+    12. si error: lanzar(error)
+    
+    13. generar_guia_envio(@envio, @transportista) -> @guia
+    14. @envio.numeroGuia := @guia
+    15. @envio.estado := "en_transito"
+    
+    16. @pedido.estado := "enviado"
+    17. @pedido.fechaEnvio := ahora()
+    
+    18. enviar_notificacion(@usuario, "pedido_enviado", @guia)
+    19. retornar @envio
+
+# ===== INVENTORY MANAGEMENT =====
+
+proceso[ReabasteceInventario]:
+  entrada: @producto, @cantidad
+  salida: bool
+  pasos:
+    1. verificar(@cantidad > 0) -> ok | error["cantidad_invalida"]
+    2. si error: lanzar(error)
+    
+    3. @producto.stock := @producto.stock + @cantidad
+    4. @producto.ultimoReabastecimiento := ahora()
+    
+    5. si @producto.stock >= @producto.stockMinimo:
+         @producto.estadoStock := "disponible"
+    
+    6. registrar_movimiento_inventario(@producto, @cantidad, "entrada")
+    7. retornar true
+
+# ===== REFUND PROCESSING =====
+
+proceso[ProcesarDevolucion]:
+  entrada: @pedido, @razon
+  salida: @devolucion | error
+  pasos:
+    1. verificar(@pedido.estado == "completado") -> ok | error["pedido_no_valido"]
+    2. verificar(dias_desde(@pedido.fechaCompletado) <= 30) -> ok | error["periodo_vencido"]
+    3. si algún error: lanzar(error)
+    
+    4. crear @devolucion
+    5. @devolucion.pedido := @pedido
+    6. @devolucion.razon := @razon
+    7. @devolucion.fecha := ahora()
+    8. @devolucion.estado := "solicitada"
+    
+    9. verificar_condicion_productos(@pedido.productos) -> aprobado | rechazado
+    10. si rechazado:
+          @devolucion.estado := "rechazada"
+          enviar_notificacion(@usuario, "devolucion_rechazada")
+          lanzar(error["devolucion_rechazada"])
+    
+    11. @devolucion.estado := "aprobada"
+    12. @devolucion.montoReembolso := @pedido.total
+    
+    13. procesar_reembolso(@pedido.metodoPago, @pedido.total) -> exito | fallo
+    14. si fallo:
+          @devolucion.estado := "fallida"
+          lanzar(error["reembolso_fallido"])
+    
+    15. @devolucion.estado := "completada"
+    16. para cada @producto en @pedido.productos:
+          @producto.stock := @producto.stock + 1
+    
+    17. @pedido.estado := "devuelto"
+    18. enviar_notificacion(@usuario, "devolucion_completada")
+    19. retornar @devolucion
+
+# ===== RECOMMENDATION SYSTEM =====
+
+proceso[GenerarRecomendaciones]:
+  entrada: @usuario
+  salida: lista[@producto]
+  pasos:
+    1. @historial := obtener_historial_compras(@usuario)
+    2. @categorias := extraer_categorias(@historial)
+    3. @preferencias := analizar_preferencias(@historial)
+    
+    4. @candidatos := obtener_productos_por_categorias(@categorias)
+    5. @candidatos := @candidatos.filtra(p -> p.stock > 0)
+    6. @candidatos := @candidatos.filtra(p -> NOT @usuario.compro(p))
+    
+    7. @candidatos := ordenar_por_similitud(@candidatos, @preferencias)
+    8. @candidatos := @candidatos.primeros(10)
+    
+    9. si @usuario.tipo == "premium":
+         aplicar_descuentos_premium(@candidatos)
+    
+    10. retornar @candidatos
+
+# ===== REPORT GENERATION =====
+
+proceso[GenerarReporteVentas]:
+  entrada: fechaInicio: fecha, fechaFin: fecha
+  salida: @reporte
+  pasos:
+    1. @pedidos := obtener_pedidos_entre(fechaInicio, fechaFin)
+    2. @pedidos := @pedidos.filtra(p -> p.estado == "completado")
+    
+    3. crear @reporte
+    4. @reporte.periodo := {inicio: fechaInicio, fin: fechaFin}
+    5. @reporte.totalPedidos := cuenta(@pedidos)
+    6. @reporte.ventaTotal := suma(@pedidos.total)
+    7. @reporte.ticketPromedio := @reporte.ventaTotal / @reporte.totalPedidos
+    
+    8. @productos_vendidos := extraer_productos(@pedidos)
+    9. @reporte.productoMasVendido := max(@productos_vendidos, por: cantidad)
+    10. @reporte.categoriaTop := agrupar_por_categoria(@productos_vendidos).max()
+    
+    11. @reporte.fechaGeneracion := ahora()
+    12. retornar @reporte
+
+# Key Insights:
+# 1. proceso[Nombre] defines a named process/workflow
+# 2. entrada: specifies input parameters
+# 3. salida: specifies return type (can be | error for errors)
+# 4. pasos: numbered steps executed sequentially
+# 5. Can call other processes (composition)
+# 6. Supports conditionals (si), loops (para cada)
+# 7. Error handling with -> ok | error pattern
+
+# Process Mapping to Vector Space:
+# Processes are hierarchical embeddings: [e_input; e_context; e_steps]
+# Each step is a transformation in the embedding space
+# Composition allows building complex behaviors from simple ones
+# Similar to deep neural networks: layers of transformations

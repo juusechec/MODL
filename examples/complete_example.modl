@@ -1,0 +1,363 @@
+# Complete MODL Example: E-Commerce System
+# This example demonstrates all 5 core constructs integrated into a complete system
+
+# ===== ENTIDADES (ENTITIES) =====
+
+@usuario[persona]
+  .nombre: texto
+  .email: texto
+  .edad: número
+  .activo: bool
+  .verificado: bool
+  .tipo: texto  # "regular" | "premium"
+  .fechaRegistro: fecha
+
+@producto[item]
+  .nombre: texto
+  .descripcion: texto
+  .precio: número
+  .precioOriginal: número
+  .stock: número
+  .categoria: texto
+  .enOferta: bool
+  .descuento: número
+  .promedioResenas: número
+
+@pedido[transaccion]
+  .id: número
+  .fecha: fecha
+  .estado: texto  # "pendiente" | "procesando" | "completado" | "cancelado"
+  .total: número
+  .direccionEnvio: texto
+  .fechaCompletado: fecha
+
+@carrito[contenedor]
+  .id: número
+  .fechaCreacion: fecha
+  .activo: bool
+  .total: número
+
+@metodoPago[medio]
+  .tipo: texto  # "tarjeta" | "efectivo" | "transferencia"
+  .titular: texto
+  .numero: texto
+  .valido: bool
+  .limite: número
+  .saldo: número
+
+@transaccion[operacion]
+  .id: número
+  .fecha: fecha
+  .monto: número
+  .estado: texto  # "pendiente" | "completado" | "fallido"
+  .referencia: texto
+  .mensajeError: texto
+
+@resena[opinion]
+  .titulo: texto
+  .contenido: texto
+  .calificacion: número  # 1-5
+  .fecha: fecha
+  .verificada: bool
+
+@direccion[ubicacion]
+  .calle: texto
+  .ciudad: texto
+  .codigoPostal: texto
+  .pais: texto
+
+# ===== RELACIONES (RELATIONS) =====
+
+@usuario --posee--> @carrito[1]
+@usuario --crea--> @pedido[*]
+@usuario --usa--> @metodoPago[1..*]
+@usuario --escribe--> @resena[*]
+@usuario --tiene--> @direccion[1..*]
+
+@pedido --contiene--> @producto[1..*]
+@pedido --pagado_con--> @metodoPago[1]
+@pedido --enviado_a--> @direccion[1]
+@pedido --genera--> @transaccion[1]
+
+@carrito --contiene--> @producto[*]
+
+@resena --evalua--> @producto[1]
+@resena --escrita_por--> @usuario[1]
+
+@transaccion --procesa--> @pedido[1]
+@transaccion --usa--> @metodoPago[1]
+
+# ===== RESTRICCIONES (CONSTRAINTS) =====
+
+# User constraints
+siempre: @usuario.edad >= 0 AND @usuario.edad <= 150
+siempre: @usuario.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+siempre: @usuario.tipo in ["regular", "premium"]
+
+# Product constraints
+siempre: @producto.precio >= 0
+siempre: @producto.stock >= 0
+siempre: @producto.promedioResenas >= 0 AND @producto.promedioResenas <= 5
+siempre: @producto.descuento >= 0 AND @producto.descuento <= 100
+siempre: (@producto.enOferta == true) -> (@producto.precio < @producto.precioOriginal)
+
+# Order constraints
+siempre: @pedido.total == suma(@pedido.productos.precio)
+siempre: @pedido.total > 0
+siempre: @pedido.estado in ["pendiente", "procesando", "completado", "cancelado"]
+siempre: cuenta(@pedido.productos) >= 1
+
+# Cart constraints
+siempre: @carrito.total == suma(@carrito.productos.precio)
+siempre: @carrito.total >= 0
+
+# Transaction constraints
+siempre: @transaccion.monto > 0
+siempre: @transaccion.monto == @pedido.total
+siempre: @transaccion.estado in ["pendiente", "completado", "fallido"]
+
+# Review constraints
+siempre: @resena.calificacion >= 1 AND @resena.calificacion <= 5
+
+# Business rules
+nunca: @usuario[edad < 18] --compra--> @producto[categoria="alcohol"]
+nunca: @usuario[activo == false] --crea--> @pedido
+nunca: @pedido --contiene--> @producto[stock == 0]
+nunca: @transaccion[estado == "fallido"] --genera--> @factura
+nunca: @metodoPago[valido == false] --usa_en--> @pedido
+
+# Liveness properties
+eventualmente: @pedido[estado == "pendiente"] -> @pedido[estado == "completado"]
+eventualmente: @transaccion[estado == "pendiente"] -> @transaccion[estado != "pendiente"]
+
+# ===== COMPORTAMIENTOS (BEHAVIORS) =====
+
+# User registration
+cuando @usuario.registrar(@email, @password, @nombre):
+  requiere: @email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+  requiere: @password.length >= 8
+  requiere: NOT existe(@usuario[email == @email])
+  ejecuta:
+    @usuario.email := @email
+    @usuario.password := hash(@password)
+    @usuario.nombre := @nombre
+    @usuario.fechaRegistro := ahora()
+    @usuario.activo := false
+    @usuario.verificado := false
+    @usuario.tipo := "regular"
+    crear @carrito para @usuario
+  garantiza: @usuario.email == @email
+  garantiza: @usuario.activo == false
+
+# Add product to cart
+cuando @usuario.añadirProducto(@producto):
+  requiere: @producto.stock > 0
+  requiere: @usuario.activo == true
+  ejecuta:
+    @carrito --contiene--> @producto
+    @carrito.total := @carrito.total + @producto.precio
+  garantiza: @carrito --contiene--> @producto
+  garantiza: @carrito.total >= @producto.precio
+
+# Create order from cart
+cuando @usuario.crearPedido():
+  requiere: @usuario.activo == true
+  requiere: @usuario.verificado == true
+  requiere: cuenta(@carrito.productos) > 0
+  requiere: todos(@carrito.productos, p -> p.stock > 0)
+  ejecuta:
+    crear @pedido
+    @pedido.estado := "pendiente"
+    @pedido.fecha := ahora()
+    @pedido.total := @carrito.total
+    para cada @producto en @carrito.productos:
+      @pedido --contiene--> @producto
+      @producto.stock := @producto.stock - 1
+    @carrito.productos := []
+    @carrito.total := 0
+  garantiza: @pedido.total > 0
+  garantiza: @pedido.estado == "pendiente"
+  garantiza: cuenta(@carrito.productos) == 0
+
+# Process payment
+cuando @pedido.procesar(@metodoPago):
+  requiere: @pedido.estado == "pendiente"
+  requiere: @metodoPago.valido == true
+  requiere: @metodoPago.saldo >= @pedido.total
+  ejecuta:
+    @pedido.estado := "procesando"
+    crear @transaccion
+    @transaccion.monto := @pedido.total
+    @transaccion.fecha := ahora()
+    @transaccion.estado := "pendiente"
+    @metodoPago.saldo := @metodoPago.saldo - @pedido.total
+    @transaccion.estado := "completado"
+    @transaccion.referencia := generar_referencia()
+    @pedido.estado := "completado"
+    @pedido.fechaCompletado := ahora()
+  garantiza: @pedido.estado == "completado"
+  garantiza: @transaccion.estado == "completado"
+
+# Write product review
+cuando @usuario.escribirResena(@producto, @calificacion, @contenido):
+  requiere: @usuario.activo == true
+  requiere: @calificacion >= 1 AND @calificacion <= 5
+  requiere: existe(@pedido[@pedido --contiene--> @producto AND @usuario --crea--> @pedido])
+  requiere: NOT existe(@resena[autor == @usuario AND producto == @producto])
+  ejecuta:
+    crear @resena
+    @resena.calificacion := @calificacion
+    @resena.contenido := @contenido
+    @resena.fecha := ahora()
+    @resena.verificada := true
+    @usuario --escribe--> @resena
+    @resena --evalua--> @producto
+    @producto.promedioResenas := recalcular_promedio(@producto)
+  garantiza: existe(@resena[autor == @usuario])
+  garantiza: @resena.calificacion >= 1 AND @resena.calificacion <= 5
+
+# Apply discount to product
+cuando @producto.aplicarDescuento(@porcentaje):
+  requiere: @porcentaje >= 0 AND @porcentaje <= 100
+  requiere: @producto.enOferta == false
+  ejecuta:
+    @producto.precioOriginal := @producto.precio
+    @producto.precio := @producto.precio * (1 - @porcentaje / 100)
+    @producto.enOferta := true
+    @producto.descuento := @porcentaje
+  garantiza: @producto.precio < @producto.precioOriginal
+  garantiza: @producto.enOferta == true
+
+# ===== COMPOSICIONES (PROCESSES) =====
+
+# Complete purchase process
+proceso[CompletarCompra]:
+  entrada: @usuario, @metodoPago, @direccion
+  salida: @pedido | error
+  pasos:
+    1. validar(@usuario.activo) -> ok | error["usuario_inactivo"]
+    2. validar(@usuario.verificado) -> ok | error["usuario_no_verificado"]
+    3. validar(cuenta(@carrito.productos) > 0) -> ok | error["carrito_vacio"]
+    4. si algún error: lanzar(error)
+    
+    5. verificar_stock(@carrito.productos) -> ok | error["sin_stock"]
+    6. si error: lanzar(error)
+    
+    7. @usuario.crearPedido() -> @pedido
+    8. @pedido.direccionEnvio := @direccion
+    
+    9. @pedido.procesar(@metodoPago) -> ok | error
+    10. si error:
+          revertir_stock(@pedido.productos)
+          @pedido.estado := "cancelado"
+          lanzar(error)
+    
+    11. enviar_confirmacion(@usuario, @pedido)
+    12. retornar @pedido
+
+# Product search and filter
+proceso[BuscarProductos]:
+  entrada: criterios: texto, categoria: texto, precioMin: número, precioMax: número
+  salida: lista[@producto]
+  pasos:
+    1. @productos := obtener_todos_productos()
+    2. @productos := @productos.filtra(p -> p.stock > 0)
+    
+    3. si criterios != "":
+         @productos := @productos.filtra(p -> 
+           p.nombre.contiene(criterios) OR 
+           p.descripcion.contiene(criterios))
+    
+    4. si categoria != "":
+         @productos := @productos.filtra(p -> p.categoria == categoria)
+    
+    5. si precioMin > 0:
+         @productos := @productos.filtra(p -> p.precio >= precioMin)
+    
+    6. si precioMax > 0:
+         @productos := @productos.filtra(p -> p.precio <= precioMax)
+    
+    7. ordenar @productos por (promedioResenas DESC, precio ASC)
+    8. retornar @productos
+
+# User registration with verification
+proceso[RegistrarUsuarioCompleto]:
+  entrada: @email, @password, @nombre
+  salida: @usuario | error
+  pasos:
+    1. validar_email(@email) -> ok | error["email_invalido"]
+    2. validar_password(@password) -> ok | error["password_debil"]
+    3. verificar(NOT existe(@usuario[email == @email])) -> ok | error["email_existe"]
+    4. si algún error: lanzar(error)
+    
+    5. crear @usuario
+    6. @usuario.registrar(@email, @password, @nombre)
+    
+    7. @token := generar_token_verificacion(@usuario)
+    8. enviar_email_verificacion(@email, @token)
+    
+    9. retornar @usuario
+
+# Recommendation engine
+proceso[GenerarRecomendaciones]:
+  entrada: @usuario
+  salida: lista[@producto]
+  pasos:
+    1. @historial := obtener_pedidos(@usuario)
+    2. @categorias := extraer_categorias(@historial)
+    3. @preferencias := analizar_preferencias(@usuario)
+    
+    4. @candidatos := obtener_productos_por_categorias(@categorias)
+    5. @candidatos := @candidatos.filtra(p -> 
+         p.stock > 0 AND 
+         NOT @usuario.compro(p))
+    
+    6. @candidatos := ordenar_por_similitud(@candidatos, @preferencias)
+    7. @candidatos := @candidatos.primeros(10)
+    
+    8. si @usuario.tipo == "premium":
+         aplicar_descuentos_premium(@candidatos)
+    
+    9. retornar @candidatos
+
+# Order cancellation and refund
+proceso[CancelarPedidoConReembolso]:
+  entrada: @pedido, @razon
+  salida: bool | error
+  pasos:
+    1. verificar(@pedido.estado in ["pendiente", "procesando"]) -> ok | error["estado_invalido"]
+    2. si error: lanzar(error)
+    
+    3. @pedido.estado := "cancelado"
+    4. @pedido.razonCancelacion := @razon
+    
+    5. para cada @producto en @pedido.productos:
+         @producto.stock := @producto.stock + 1
+    
+    6. si existe(@transaccion[@transaccion --procesa--> @pedido]):
+         revertir_pago(@transaccion) -> ok | error
+         si error: lanzar(error)
+    
+    7. enviar_notificacion(@usuario, "pedido_cancelado")
+    8. retornar true
+
+# ===== SYSTEM SUMMARY =====
+
+# This complete example demonstrates:
+# 1. Entity definitions for all domain objects
+# 2. Relations showing how entities connect
+# 3. Constraints ensuring business rules and data integrity
+# 4. Behaviors defining operations with contracts
+# 5. Processes composing complex workflows
+
+# The system models a complete e-commerce flow:
+# - User registration and verification
+# - Product browsing and search
+# - Shopping cart management
+# - Order creation and payment processing
+# - Product reviews
+# - Recommendations
+# - Order cancellation and refunds
+
+# All constructs work together to create a formal, verifiable,
+# and executable model of the system with clear semantics.
