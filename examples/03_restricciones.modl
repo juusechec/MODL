@@ -1,0 +1,168 @@
+# Example 03: Restricciones (Constraints)
+
+# Constraints define rules and invariants that must always hold.
+# They use temporal operators: siempre, nunca, eventualmente
+
+# ===== SIEMPRE (Always/Invariant) =====
+# Things that must always be true
+
+# Basic numeric constraints
+siempre: @usuario.edad >= 0
+siempre: @usuario.edad <= 150
+siempre: @producto.precio >= 0
+siempre: @producto.stock >= 0
+
+# Business rule constraints
+siempre: @pedido.total == suma(@pedido.productos.precio)
+siempre: @pedido.total > 0
+
+# State consistency
+siempre: @usuario.activo == true OR @usuario.activo == false
+siempre: @pedido.estado in ["pendiente", "procesando", "completado", "cancelado"]
+
+# Relational constraints
+siempre: @transaccion.monto == @pedido.total
+siempre: cuenta(@pedido.productos) >= 1  # At least one product
+
+# Email validation (using pattern matching)
+siempre: @usuario.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+
+# Consistency across entities
+siempre: @carrito.total == suma(@carrito.productos.precio)
+siempre: @resena.calificacion >= 1 AND @resena.calificacion <= 5
+
+# ===== NUNCA (Never/Forbidden) =====
+# Things that must never happen
+
+# Business rules
+nunca: @usuario[edad < 18] --compra--> @producto[categoria="alcohol"]
+nunca: @usuario[activo == false] --crea--> @pedido
+
+# Data integrity
+nunca: @pedido.total < 0
+nunca: @producto.stock < 0
+
+# Access control
+nunca: @usuario[tipo != "admin"] --modifica--> @configuracion
+nunca: @usuario --elimina--> @pedido[estado == "completado"]
+
+# Security constraints
+nunca: @metodoPago.numero.visible == true  # Credit card must be masked
+nunca: @transaccion[estado == "fallido"] --genera--> @factura
+
+# Logical impossibilities
+nunca: @usuario --compra--> @producto[stock == 0]
+nunca: @pedido[estado == "cancelado"] --evoluciona_a--> @transaccion
+
+# Temporal impossibilities
+nunca: @pedido.fecha > ahora()  # Can't create future orders
+nunca: @resena.fecha < @producto.fechaCreacion  # Can't review before product exists
+
+# Complex business rules
+nunca: @usuario.edad < 18 AND @pedido.contiene(@producto[categoria="alcohol"])
+nunca: @transaccion.monto > @metodoPago.limiteCredito
+nunca: @pedido --contiene--> @producto[activo == false]
+
+# ===== EVENTUALMENTE (Eventually/Liveness) =====
+# Things that must happen in the future
+
+# Process completion
+eventualmente: @pedido[estado == "pendiente"] -> @pedido[estado == "completado"]
+eventualmente: @transaccion[estado == "procesando"] -> @transaccion[estado == "completado"]
+
+# State progression
+eventualmente: @usuario[nuevo == true] -> @usuario[verificado == true]
+eventualmente: @carrito[activo == true] -> @pedido[estado == "completado"]
+
+# Payment processing
+eventualmente: @pedido[estado == "pendiente"] -> @transaccion
+eventualmente: @transaccion[estado == "pendiente"] -> @transaccion[estado != "pendiente"]
+
+# Notification requirements
+eventualmente: @pedido[estado == "enviado"] -> @notificacion[tipo == "entrega"]
+
+# ===== COMPLEX CONSTRAINTS =====
+
+# Multiple conditions
+siempre: (
+  @producto.enOferta == true 
+  -> 
+  @producto.precioOferta < @producto.precio
+)
+
+# Conditional constraints
+siempre: (
+  @usuario.tipo == "premium"
+  ->
+  @usuario.descuento >= 10
+)
+
+# Aggregation constraints
+siempre: suma(@usuario.pedidos.total) >= 0
+siempre: promedio(@producto.resenas.calificacion) >= 0 AND promedio(@producto.resenas.calificacion) <= 5
+
+# Existence constraints
+siempre: (
+  @pedido[estado == "completado"]
+  ->
+  existe(@transaccion[pedido == @pedido])
+)
+
+# Uniqueness constraints
+siempre: unico(@usuario.email)  # Each email is unique
+siempre: unico(@pedido.id)  # Each order ID is unique
+
+# Cardinality constraints
+siempre: cuenta(@pedido.productos) >= 1 AND cuenta(@pedido.productos) <= 100
+siempre: cuenta(@usuario.direcciones) <= 5
+
+# Time-based constraints
+siempre: @pedido.fechaEntrega >= @pedido.fechaCreacion
+siempre: @resena.fecha <= ahora()
+
+# Referential integrity
+siempre: (
+  @pedido --contiene--> @producto
+  ->
+  existe(@producto)
+)
+
+# ===== CONSTRAINT NAMING =====
+
+# Named constraints for reusability
+Constraint EdadValida: Persona {
+  condición: edad >= 0 AND edad <= 150
+  mensaje: "Edad debe estar entre 0 y 150"
+}
+
+Constraint EmailValido: Usuario {
+  condición: email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+  mensaje: "Formato de email inválido"
+}
+
+Constraint PrecioPositivo: Producto {
+  condición: precio > 0
+  mensaje: "El precio debe ser positivo"
+}
+
+Constraint StockNoNegativo: Producto {
+  condición: stock >= 0
+  mensaje: "El stock no puede ser negativo"
+}
+
+Constraint EstadoPedidoValido: Pedido {
+  condición: estado in ["pendiente", "procesando", "completado", "cancelado"]
+  mensaje: "Estado de pedido inválido"
+}
+
+# Key Insights:
+# 1. siempre: defines invariants (must always be true)
+# 2. nunca: defines forbidden states/transitions
+# 3. eventualmente: defines liveness properties (must happen)
+# 4. Constraints can be simple or complex boolean expressions
+# 5. Named constraints can be reused and provide error messages
+
+# Constraint Mapping to Vector Space:
+# Constraints define valid regions: siempre: @usuario.edad >= 18 → V = {v ∈ ℝⁿ | edad(v) ≥ 18}
+# Invalid regions are excluded from the embedding space
+# Enables verification through geometric reasoning

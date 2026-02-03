@@ -1,0 +1,224 @@
+# Example 04: Comportamientos (Behaviors)
+
+# Behaviors define operations with formal contracts (pre/post conditions).
+# Syntax: cuando @entidad.acción(params): requiere: ... ejecuta: ... garantiza: ...
+
+# ===== BASIC BEHAVIORS =====
+
+# Simple behavior with precondition and execution
+cuando @usuario.activar():
+  requiere: @usuario.activo == false
+  ejecuta:
+    @usuario.activo := true
+    @usuario.fechaActivacion := ahora()
+  garantiza: @usuario.activo == true
+
+# Behavior with parameters
+cuando @usuario.añadirProducto(@producto):
+  requiere: @producto.stock > 0
+  requiere: @usuario.activo == true
+  ejecuta:
+    @carrito --contiene--> @producto
+    @carrito.total := @carrito.total + @producto.precio
+  garantiza: @carrito.total >= @producto.precio
+
+# ===== ORDER CREATION =====
+
+cuando @usuario.crea(@pedido):
+  requiere: @usuario.activo == true
+  requiere: cuenta(@carrito.productos) > 0
+  requiere: todos(@carrito.productos, p -> p.stock > 0)
+  ejecuta:
+    @pedido.estado := "pendiente"
+    @pedido.fecha := ahora()
+    @pedido.total := suma(@carrito.productos.precio)
+    para cada @producto en @carrito.productos:
+      @pedido --contiene--> @producto
+      @producto.stock := @producto.stock - 1
+    @carrito.productos := []
+  garantiza: @pedido.total > 0
+  garantiza: @pedido.estado == "pendiente"
+  garantiza: cuenta(@pedido.productos) > 0
+
+# ===== PAYMENT PROCESSING =====
+
+cuando @pedido.procesar(@metodoPago):
+  requiere: @pedido.estado == "pendiente"
+  requiere: @metodoPago.valido == true
+  requiere: @metodoPago.limite >= @pedido.total
+  ejecuta:
+    @pedido.estado := "procesando"
+    @transaccion.monto := @pedido.total
+    @transaccion.fecha := ahora()
+    @transaccion.estado := "pendiente"
+    @metodoPago.saldo := @metodoPago.saldo - @pedido.total
+  garantiza: @pedido.estado == "procesando"
+  garantiza: @transaccion.monto == @pedido.total
+  garantiza: @transaccion.estado == "pendiente"
+
+# ===== PRODUCT MANAGEMENT =====
+
+cuando @producto.actualizar_precio(@nuevoPrecio):
+  requiere: @nuevoPrecio > 0
+  requiere: @usuario.tipo == "admin"
+  ejecuta:
+    @producto.precioAnterior := @producto.precio
+    @producto.precio := @nuevoPrecio
+    @producto.fechaActualizacion := ahora()
+  garantiza: @producto.precio == @nuevoPrecio
+  garantiza: @producto.precioAnterior != @nuevoPrecio
+
+cuando @producto.aplicar_descuento(@porcentaje):
+  requiere: @porcentaje >= 0 AND @porcentaje <= 100
+  requiere: @producto.enOferta == false
+  ejecuta:
+    @producto.precioOriginal := @producto.precio
+    @producto.precio := @producto.precio * (1 - @porcentaje / 100)
+    @producto.enOferta := true
+    @producto.descuento := @porcentaje
+  garantiza: @producto.precio < @producto.precioOriginal
+  garantiza: @producto.enOferta == true
+
+# ===== USER MANAGEMENT =====
+
+cuando @usuario.registrar(@email, @password):
+  requiere: @email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+  requiere: @password.length >= 8
+  requiere: NOT existe(@usuario[email == @email])
+  ejecuta:
+    @usuario.email := @email
+    @usuario.password := hash(@password)
+    @usuario.fechaRegistro := ahora()
+    @usuario.activo := false
+    @usuario.verificado := false
+    enviar_email_verificacion(@email)
+  garantiza: @usuario.email == @email
+  garantiza: @usuario.activo == false
+  garantiza: @usuario.verificado == false
+
+cuando @usuario.verificar(@token):
+  requiere: @usuario.verificado == false
+  requiere: validar_token(@token, @usuario)
+  ejecuta:
+    @usuario.verificado := true
+    @usuario.activo := true
+    @usuario.fechaVerificacion := ahora()
+  garantiza: @usuario.verificado == true
+  garantiza: @usuario.activo == true
+
+# ===== REVIEW MANAGEMENT =====
+
+cuando @usuario.escribir_resena(@producto, @calificacion, @contenido):
+  requiere: @usuario.activo == true
+  requiere: @calificacion >= 1 AND @calificacion <= 5
+  requiere: @usuario --compro--> @producto  # Must have purchased
+  requiere: NOT existe(@resena[autor == @usuario AND producto == @producto])
+  ejecuta:
+    crear @resena
+    @resena.autor := @usuario
+    @resena.producto := @producto
+    @resena.calificacion := @calificacion
+    @resena.contenido := @contenido
+    @resena.fecha := ahora()
+    @resena.verificada := true
+    @producto.promedioResenas := recalcular_promedio(@producto)
+  garantiza: existe(@resena[autor == @usuario AND producto == @producto])
+  garantiza: @resena.calificacion >= 1 AND @resena.calificacion <= 5
+
+# ===== CART MANAGEMENT =====
+
+cuando @carrito.vaciar():
+  requiere: cuenta(@carrito.productos) > 0
+  ejecuta:
+    @carrito.productos := []
+    @carrito.total := 0
+  garantiza: cuenta(@carrito.productos) == 0
+  garantiza: @carrito.total == 0
+
+cuando @carrito.eliminar_producto(@producto):
+  requiere: @carrito --contiene--> @producto
+  ejecuta:
+    remover @producto de @carrito.productos
+    @carrito.total := @carrito.total - @producto.precio
+  garantiza: NOT (@carrito --contiene--> @producto)
+  garantiza: @carrito.total >= 0
+
+# ===== ORDER STATE TRANSITIONS =====
+
+cuando @pedido.completar():
+  requiere: @pedido.estado == "procesando"
+  requiere: existe(@transaccion[pedido == @pedido AND estado == "completado"])
+  ejecuta:
+    @pedido.estado := "completado"
+    @pedido.fechaCompletado := ahora()
+    generar_factura(@pedido)
+    enviar_notificacion(@usuario, "pedido_completado")
+  garantiza: @pedido.estado == "completado"
+
+cuando @pedido.cancelar(@razon):
+  requiere: @pedido.estado in ["pendiente", "procesando"]
+  requiere: @razon != ""
+  ejecuta:
+    @pedido.estado := "cancelado"
+    @pedido.razonCancelacion := @razon
+    @pedido.fechaCancelacion := ahora()
+    para cada @producto en @pedido.productos:
+      @producto.stock := @producto.stock + 1
+    si @transaccion existe:
+      revertir_pago(@transaccion)
+  garantiza: @pedido.estado == "cancelado"
+  garantiza: @pedido.razonCancelacion == @razon
+
+# ===== COMPLEX BEHAVIOR WITH MULTIPLE PATHS =====
+
+cuando @pedido.actualizar_estado(@nuevoEstado):
+  requiere: @nuevoEstado in ["pendiente", "procesando", "completado", "cancelado"]
+  ejecuta:
+    caso @pedido.estado == "pendiente" AND @nuevoEstado == "procesando":
+      @pedido.estado := "procesando"
+      @pedido.fechaProcesamiento := ahora()
+    
+    caso @pedido.estado == "procesando" AND @nuevoEstado == "completado":
+      @pedido.estado := "completado"
+      @pedido.fechaCompletado := ahora()
+    
+    caso @nuevoEstado == "cancelado":
+      @pedido.estado := "cancelado"
+      @pedido.fechaCancelacion := ahora()
+      revertir_inventario(@pedido)
+    
+    caso otro:
+      lanzar(error["transicion_invalida"])
+  
+  garantiza: @pedido.estado == @nuevoEstado
+
+# ===== BEHAVIORS WITH SIDE EFFECTS =====
+
+cuando @transaccion.procesar():
+  requiere: @transaccion.estado == "pendiente"
+  requiere: @metodoPago.saldo >= @transaccion.monto
+  ejecuta:
+    intentar:
+      @metodoPago.saldo := @metodoPago.saldo - @transaccion.monto
+      @transaccion.estado := "completado"
+      @transaccion.fechaCompletado := ahora()
+      @transaccion.referencia := generar_referencia()
+    capturar error:
+      @transaccion.estado := "fallido"
+      @transaccion.mensajeError := error.mensaje
+      lanzar(error)
+  garantiza: @transaccion.estado in ["completado", "fallido"]
+
+# Key Insights:
+# 1. cuando defines behavior with parameters
+# 2. requiere: specifies preconditions (must be true before execution)
+# 3. ejecuta: defines the operations to perform
+# 4. garantiza: specifies postconditions (must be true after execution)
+# 5. Multiple requires/guarantees are allowed
+# 6. Behaviors can be complex with conditionals and loops
+
+# Behavior Mapping to Vector Space:
+# Behaviors are differentiable functions in the embedding space
+# Pre/post conditions define valid state transitions
+# Similar to attention mechanisms: f: State_before → State_after
+# Enables learning and verification of behavior contracts
