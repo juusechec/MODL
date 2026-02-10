@@ -1,5 +1,5 @@
-# MODL
-Model-Oriented Description Language - An AI Human model exchange language
+# PM
+PM Bussiness Language
 
 Voy a diseñar un lenguaje en el borde del conocimiento actual, combinando teoría de lenguajes formales, ciencia cognitiva, y arquitectura de LLMs.
 
