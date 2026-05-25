@@ -96,7 +96,11 @@ pub fn graph_from_pmdl(content: &str) -> GraphView {
     let mut nodes: Vec<GraphNode> = Vec::new();
     let mut edges: Vec<GraphEdge> = Vec::new();
 
-    for line in content.lines().map(|line| line.trim()).filter(|line| !line.is_empty()) {
+    for line in content
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+    {
         if let Some((left, right)) = line.split_once("--") {
             if let Some((relation, to_side)) = right.split_once("-->") {
                 let from = left.trim().trim_start_matches('@').to_string();
@@ -167,7 +171,8 @@ mod tests {
     fn keeps_text_and_graph_in_sync() {
         let base = PmdlDocument {
             schema_version: "pmdl.v1".to_string(),
-            content: "@usuario[persona]\n@pedido[transaccion]\n@usuario --crea--> @pedido".to_string(),
+            content: "@usuario[persona]\n@pedido[transaccion]\n@usuario --crea--> @pedido"
+                .to_string(),
         };
 
         let mut session = LiveSession::new(base, "user-1");

@@ -1,6 +1,6 @@
 use crate::contracts::{
-    GenerationContext, PipelineInput, PipelineOutput, PmdlDocument, PromptContext, StageEvent, StageName,
-    StageStatus, ValidationError, ValidationReport,
+    GenerationContext, PipelineInput, PipelineOutput, PmdlDocument, PromptContext, StageEvent,
+    StageName, StageStatus, ValidationError, ValidationReport,
 };
 use crate::errors::{EngineError, EngineErrorKind, EngineResult};
 
@@ -101,7 +101,11 @@ where
 
         self.governance.authorize(&input.user_id)?;
 
-        self.emit(StageName::Dictation, StageStatus::Started, "dictation received")?;
+        self.emit(
+            StageName::Dictation,
+            StageStatus::Started,
+            "dictation received",
+        )?;
         self.emit(
             StageName::Transcription,
             StageStatus::Started,
@@ -110,9 +114,7 @@ where
         let transcript = self
             .transcriber
             .transcribe(&input.audio_pcm, &input.language)
-            .map_err(|e| {
-                EngineError::new(EngineErrorKind::Transcription, e.code, e.message)
-            })?;
+            .map_err(|e| EngineError::new(EngineErrorKind::Transcription, e.code, e.message))?;
         self.emit(
             StageName::Transcription,
             StageStatus::Succeeded,
@@ -135,7 +137,6 @@ where
         )?;
 
         let mut current_prompt = prompt.clone();
-        let mut final_document: Option<PmdlDocument> = None;
         let mut final_validation = ValidationReport::with_errors(vec![ValidationError {
             code: "PMDL_VALIDATION_NOT_RUN".to_string(),
             message: "validation not run".to_string(),
@@ -145,7 +146,11 @@ where
         }]);
 
         for attempt in 1..=self.config.max_iterations {
-            self.emit(StageName::Generation, StageStatus::Started, "llm generation")?;
+            self.emit(
+                StageName::Generation,
+                StageStatus::Started,
+                "llm generation",
+            )?;
             let generated = self
                 .generator
                 .generate(
@@ -162,7 +167,11 @@ where
                 "llm generation completed",
             )?;
 
-            self.emit(StageName::Validation, StageStatus::Started, "validation started")?;
+            self.emit(
+                StageName::Validation,
+                StageStatus::Started,
+                "validation started",
+            )?;
             let report = self.validator.validate(&generated);
             self.emit(
                 StageName::Validation,
@@ -171,12 +180,11 @@ where
             )?;
 
             if report.is_valid {
-                final_document = Some(generated);
                 final_validation = report;
                 return Ok(PipelineOutput {
                     transcript,
                     prompt,
-                    final_document: final_document.expect("final document exists"),
+                    final_document: generated,
                     validation: final_validation,
                     iterations_used: attempt,
                 });
@@ -190,7 +198,6 @@ where
             current_prompt = self
                 .prompt_builder
                 .build_feedback_prompt(&prompt, &generated, &report);
-            final_document = Some(generated);
             final_validation = report;
             self.emit(
                 StageName::Feedback,
@@ -257,7 +264,11 @@ mod tests {
         calls: RefCell<usize>,
     }
     impl PmdlGenerator for DummyGenerator {
-        fn generate(&self, _prompt: &str, _context: &GenerationContext) -> EngineResult<PmdlDocument> {
+        fn generate(
+            &self,
+            _prompt: &str,
+            _context: &GenerationContext,
+        ) -> EngineResult<PmdlDocument> {
             let mut calls = self.calls.borrow_mut();
             *calls += 1;
             let content = if *calls == 1 {
@@ -339,7 +350,12 @@ mod tests {
 
         assert!(output.validation.is_valid);
         assert_eq!(output.iterations_used, 2);
-        assert!(output.final_document.content.contains("@pedido[transaccion]"));
+        assert!(
+            output
+                .final_document
+                .content
+                .contains("@pedido[transaccion]")
+        );
     }
 
     #[test]

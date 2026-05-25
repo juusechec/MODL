@@ -134,3 +134,15 @@ Combina:
 - **HCI moderno** (notaciones secundarias de Petre)
 
 No existe en esta combinación específica. Los lenguajes formales son muy formales. Los DSLs son muy específicos. Este es un "lenguaje de pensamiento" para humano-IA.
+
+
+## Implementación en Rust
+
+Se añadió una base de motor PMDL en Rust en `/home/runner/work/MODL/MODL/pmdl_engine`.
+
+- Entrada: audio PCM + idioma + usuario
+- Pipeline: transcripción → prompt → generación PMDL → validación
+- Retroalimentación automática al LLM hasta convergencia o límite
+- Sesión en vivo con sincronización de texto PMDL y grafo
+
+Ver detalles en `pmdl_engine/README.md`.
