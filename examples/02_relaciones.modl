@@ -1,0 +1,94 @@
+# Example 02: Relaciones (Relations)
+
+# Relations define directional connections between entities.
+# They express semantic edges in the mental graph.
+
+# Basic one-to-one relation
+@usuario --posee--> @carrito
+
+# One-to-many relation with explicit cardinality
+@usuario --crea--> @pedido[1..*]
+# Read as: "A user creates one or more orders"
+
+# Many-to-many relation
+@pedido --contiene--> @producto[1..*]
+@producto --aparece_en--> @pedido[*]
+
+# Cardinality specifications:
+# [1] - exactly one
+# [*] - zero or more
+# [1..*] - one or more
+# [0..1] - zero or one
+# [2..5] - between 2 and 5
+
+# Relations can express business processes
+@usuario --añade--> @producto  # to cart
+@usuario --compra--> @producto[1..*]  # purchase
+@usuario --revisa--> @producto  # review
+
+# Hierarchical relations
+@usuario --pertenece_a--> @empresa
+@producto --clasificado_en--> @categoria
+@categoria --subcategoria_de--> @categoria  # recursive
+
+# State transitions (implicit in relations)
+@pedido --evoluciona_a--> @transaccion
+@transaccion --genera--> @factura
+
+# Relations with business rules implied
+@usuario --usa--> @metodoPago[1..*]
+@pedido --pagado_con--> @metodoPago[1]
+
+# Temporal relations
+@usuario --registro_en--> @fecha
+@pedido --creado_en--> @fecha
+
+# Relations representing ownership
+@empresa --emplea--> @usuario[1..*]
+@usuario --trabaja_en--> @empresa[0..1]
+
+# Relations for reviews and ratings
+@usuario --escribe--> @resena
+@resena --evalua--> @producto
+@resena --autor--> @usuario
+
+# Relations showing dependencies
+@transaccion --depende_de--> @pedido[1]
+@pedido --requiere--> @metodoPago[1]
+@pedido --enviado_a--> @direccion[1]
+
+# Complex relation chains (composition)
+# @usuario --crea--> @pedido --contiene--> @producto
+# This reads: "user creates order which contains products"
+
+# Bidirectional implications (both directions meaningful)
+@usuario --gestiona--> @empresa[0..1]
+@empresa --gestionada_por--> @usuario[1]
+
+# Relations with semantic weight
+@usuarioPremium --accede_a--> @ofertaExclusiva
+# Implicit: only premium users can access exclusive offers
+
+# Relations expressing constraints
+@usuario[edad >= 18] --compra--> @producto[categoria="alcohol"]
+# Type refinement in relations
+
+# Key Insights:
+# 1. Relations use --> arrow for directionality
+# 2. Verb in the middle describes the relationship
+# 3. Cardinality in [] specifies how many
+# 4. Relations are typed edges in a graph
+# 5. Can be composed to form paths
+
+# Relation Mapping to Vector Space:
+# Relation as transformation: @usuario --crea--> @pedido becomes T: ℝⁿᵤ → ℝⁿₚ
+# Similar to attention mechanism: Query(usuario), Key(pedido), Value(relación)
+# Enables graph neural network operations
+
+# Real-world example chain:
+@usuario --añade--> @producto  # Add to cart
+@usuario --crea--> @pedido  # Create order
+@pedido --contiene--> @producto[1..*]  # Order contains products
+@pedido --pagado_con--> @metodoPago  # Payment method
+@transaccion --procesa--> @pedido  # Process order
+@pedido --enviado_a--> @direccion  # Shipping address

@@ -1,0 +1,98 @@
+# Example 01: Entidades (Entities)
+
+# Entities are the fundamental building blocks in MODL.
+# They represent objects with identity and attributes.
+
+# Basic entity definition
+@usuario[persona]
+  .nombre: texto
+  .edad: número
+  .activo: bool
+
+# Entity with more attributes
+@producto[item]
+  .nombre: texto
+  .descripcion: texto
+  .precio: número
+  .stock: número
+  .categoria: texto
+  .enOferta: bool
+
+# Entity representing transactions
+@pedido[transaccion]
+  .id: número
+  .fecha: fecha
+  .estado: texto
+  .total: número
+  .moneda: texto
+
+# Entity with default/example values
+@direccion[ubicacion]
+  .calle: texto = "Av. Principal"
+  .numero: número = 123
+  .ciudad: texto = "Ciudad"
+  .codigoPostal: texto = "12345"
+  .pais: texto = "País"
+
+# Entity representing payment method
+@metodoPago[medio]
+  .tipo: texto  # "tarjeta", "efectivo", "transferencia"
+  .titular: texto
+  .numero: texto
+  .valido: bool
+
+# Entity for shopping cart
+@carrito[contenedor]
+  .id: número
+  .fechaCreacion: fecha
+  .activo: bool
+  .total: número
+
+# Entity representing a transaction
+@transaccion[operacion]
+  .id: número
+  .fecha: fecha
+  .monto: número
+  .estado: texto  # "pendiente", "completado", "fallido"
+  .referencia: texto
+
+# Nested/complex entity
+@empresa[organizacion]
+  .nombre: texto
+  .rfc: texto
+  .direccion: texto
+  .telefono: texto
+  .email: texto
+  .sitioWeb: texto
+
+# Entity with type refinement (dependent types light)
+@usuarioPremium[persona]
+  .nombre: texto
+  .nivel: número
+  .descuento: número  # percentage
+
+# Entity for product reviews
+@resena[opinion]
+  .titulo: texto
+  .contenido: texto
+  .calificacion: número  # 1-5 stars
+  .fecha: fecha
+  .verificada: bool
+
+# Simple entity for categories
+@categoria[clasificacion]
+  .nombre: texto
+  .descripcion: texto
+  .activa: bool
+
+# Key Insights:
+# 1. Entities use @ prefix for visual distinction
+# 2. [tipo] indicates the conceptual category
+# 3. Attributes use .nombre: tipo format
+# 4. Types are primitive (texto, número, bool, fecha) or composite
+# 5. Optional default values can be specified with =
+
+# Entity Mapping to Vector Space:
+# Each entity becomes a vector: @usuario → [e_nombre, e_edad, e_activo, ...] ∈ ℝⁿ
+# Attributes contribute dimensions to the embedding space
+# This enables semantic operations like similarity search
