@@ -7,3 +7,6 @@ pub use contracts::*;
 pub use errors::*;
 pub use live::*;
 pub use pipeline::*;
+
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;

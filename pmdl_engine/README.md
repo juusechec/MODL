@@ -10,6 +10,7 @@ Base robusta en **Rust** para el motor PMDL/MODL.
 - Modo human-in-the-loop con historial de revisiones
 - Fuente única de verdad textual (PMDL) y proyección de grafo en tiempo real
 - Primitivas de gobernanza (autorización y redacción) y telemetría de etapas
+- **Módulo WebAssembly** — corre directamente en el navegador
 
 ## Estructura
 
@@ -17,6 +18,7 @@ Base robusta en **Rust** para el motor PMDL/MODL.
 - `src/errors.rs`: errores normalizados del motor
 - `src/pipeline.rs`: orquestación, feedback loop, telemetría y seguridad
 - `src/live.rs`: sesión en vivo, revisiones y sincronización texto↔grafo
+- `src/wasm.rs`: API pública expuesta a JavaScript vía `wasm-bindgen`
 - `src/lib.rs`: exports públicos
 
 ## Ejecutar validación local
@@ -25,6 +27,59 @@ Base robusta en **Rust** para el motor PMDL/MODL.
 cargo fmt --all
 cargo test
 cargo check
+```
+
+## Compilar para WebAssembly (navegador)
+
+### Prerequisitos
+
+```bash
+# 1. Instalar wasm-pack
+cargo install wasm-pack
+
+# 2. Instalar el target wasm32 (si no lo tienes)
+rustup target add wasm32-unknown-unknown
+```
+
+### Build
+
+```bash
+# Desde el directorio pmdl_engine/
+wasm-pack build --target web --out-dir ../www/pkg
+```
+
+Esto genera en `www/pkg/`:
+- `pmdl_engine.js` — módulo ES que carga el WASM
+- `pmdl_engine_bg.wasm` — binario WebAssembly optimizado
+- `pmdl_engine.d.ts` — tipos TypeScript
+
+### Demo en navegador
+
+```bash
+# Servir la carpeta www/ con cualquier servidor HTTP estático
+cd ../www
+python3 -m http.server 8080
+# Luego abrir http://localhost:8080
+```
+
+### API JavaScript
+
+```js
+import init, { validate_modl } from './pkg/pmdl_engine.js';
+
+await init();   // carga e inicializa el módulo WASM
+
+const result = JSON.parse(validate_modl(JSON.stringify({
+  content: `@usuario[persona]
+@pedido[transaccion]
+@usuario --crea--> @pedido`,
+  schema_version: 'pmdl.v1'   // opcional
+})));
+
+// result.ok       — true si no hay errores de sintaxis
+// result.graph    — { nodes: [...], edges: [...] }
+// result.errors   — lista de errores de validación con línea, código y sugerencia
+console.log(result);
 ```
 
 ## Próximos pasos recomendados

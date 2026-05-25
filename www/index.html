@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MODL — Editor en Navegador (WebAssembly)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.25rem 2rem;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3748;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 700; color: #63b3ed; }
+    header span { font-size: 0.8rem; background: #2d3748; color: #90cdf4; padding: 2px 8px; border-radius: 999px; }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 1px;
+      background: #2d3748;
+      padding: 1px;
+    }
+
+    .panel {
+      background: #1a1d27;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-title {
+      padding: 0.6rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #718096;
+      border-bottom: 1px solid #2d3748;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title .badge {
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .badge-ok  { background: #276749; color: #9ae6b4; }
+    .badge-err { background: #742a2a; color: #feb2b2; }
+    .badge-idle { background: #2d3748; color: #718096; }
+
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 1rem;
+      font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: #e2e8f0;
+      tab-size: 2;
+    }
+
+    .output {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Graph panel */
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .node-circle { fill: #2b6cb0; stroke: #63b3ed; stroke-width: 1.5; }
+    .node-label  { fill: #e2e8f0; font-size: 13px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .edge-line   { stroke: #4a5568; stroke-width: 1.5; marker-end: url(#arrow); }
+    .edge-label  { fill: #718096; font-size: 11px; text-anchor: middle; }
+
+    .error-item {
+      margin-bottom: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      background: #2d2020;
+      border-left: 3px solid #fc8181;
+      border-radius: 0 4px 4px 0;
+    }
+    .error-code { color: #fc8181; font-weight: 700; font-size: 0.78rem; }
+    .error-msg  { color: #fbd38d; font-size: 0.82rem; }
+    .error-hint { color: #718096; font-size: 0.75rem; margin-top: 2px; }
+
+    footer {
+      padding: 0.5rem 2rem;
+      background: #1a1d27;
+      border-top: 1px solid #2d3748;
+      font-size: 0.75rem;
+      color: #4a5568;
+      display: flex;
+      gap: 1.5rem;
+    }
+    #status { color: #68d391; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>MODL</h1>
+  <span>WebAssembly</span>
+</header>
+
+<main>
+  <!-- Editor -->
+  <div class="panel" style="grid-row: span 2;">
+    <div class="panel-title">
+      Editor MODL
+      <span id="editor-badge" class="badge badge-idle">•</span>
+    </div>
+    <textarea id="editor" spellcheck="false"><!-- Ejemplo completo de MODL -->
+# 1. Entidades
+@usuario[persona]
+  .nombre: texto
+  .edad: número
+  .activo: bool
+
+@pedido[transaccion]
+  .estado: texto
+  .total: número
+
+@producto[articulo]
+  .precio: número
+  .stock: número
+
+# 2. Relaciones
+@usuario --crea--> @pedido
+@pedido --contiene--> @producto
+
+# 3. Comportamiento
+cuando @usuario.crea(@pedido):
+  requiere: @usuario.activo
+  ejecuta:
+    @pedido.estado := "pendiente"
+  garantiza: @pedido.total > 0
+
+# 4. Restricciones
+siempre: @pedido.total > 0
+nunca: @producto.stock < 0
+</textarea>
+  </div>
+
+  <!-- Grafo -->
+  <div class="panel">
+    <div class="panel-title">Grafo de Entidades</div>
+    <svg id="graph-svg">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#4a5568"/>
+        </marker>
+      </defs>
+      <g id="graph-root"></g>
+    </svg>
+  </div>
+
+  <!-- Validación -->
+  <div class="panel">
+    <div class="panel-title">
+      Validación
+      <span id="errors-badge" class="badge badge-idle">—</span>
+    </div>
+    <div id="errors-output" class="output"></div>
+  </div>
+</main>
+
+<footer>
+  <span id="status">Cargando WebAssembly…</span>
+  <span>Motor: pmdl_engine.wasm</span>
+</footer>
+
+<script type="module">
+  // ── Load WASM ───────────────────────────────────────────────────────────────
+  let validateModl = null;
+
+  async function loadWasm() {
+    try {
+      const mod = await import('./pkg/pmdl_engine.js');
+      await mod.default();               // init()
+      validateModl = mod.validate_modl;
+      document.getElementById('status').textContent = '✓ WebAssembly listo';
+      runValidation();
+    } catch (err) {
+      document.getElementById('status').textContent = '✗ Error cargando WASM: ' + err.message;
+      console.error(err);
+    }
+  }
+
+  // ── Validation ──────────────────────────────────────────────────────────────
+  function runValidation() {
+    if (!validateModl) return;
+
+    const content = document.getElementById('editor').value;
+    // Strip HTML comment wrapper if present in the textarea default value
+    const clean = content.replace(/^<!--.*?-->\n/s, '');
+
+    let result;
+    try {
+      const json = validateModl(JSON.stringify({ content: clean }));
+      result = JSON.parse(json);
+    } catch (e) {
+      setEditorBadge(false);
+      document.getElementById('errors-output').textContent = 'Error interno: ' + e.message;
+      return;
+    }
+
+    setEditorBadge(result.ok);
+    renderErrors(result.errors ?? []);
+    renderGraph(result.graph ?? { nodes: [], edges: [] });
+  }
+
+  // ── Badges ──────────────────────────────────────────────────────────────────
+  function setEditorBadge(ok) {
+    const badge = document.getElementById('editor-badge');
+    badge.textContent = ok ? '✓ válido' : '✗ errores';
+    badge.className = 'badge ' + (ok ? 'badge-ok' : 'badge-err');
+
+    const eb = document.getElementById('errors-badge');
+    eb.textContent = ok ? '0 errores' : 'ver errores';
+    eb.className = 'badge ' + (ok ? 'badge-ok' : 'badge-err');
+  }
+
+  // ── Error rendering ─────────────────────────────────────────────────────────
+  function renderErrors(errors) {
+    const el = document.getElementById('errors-output');
+    if (errors.length === 0) {
+      el.innerHTML = '<span style="color:#68d391">✓ Documento MODL válido — sin errores</span>';
+      return;
+    }
+    el.innerHTML = errors.map(e => `
+      <div class="error-item">
+        <div class="error-code">${e.code}${e.line != null ? ` — línea ${e.line}` : ''}</div>
+        <div class="error-msg">${e.message}</div>
+        ${e.hint ? `<div class="error-hint">💡 ${e.hint}</div>` : ''}
+      </div>`).join('');
+  }
+
+  // ── Graph rendering ─────────────────────────────────────────────────────────
+  function renderGraph({ nodes, edges }) {
+    const root = document.getElementById('graph-root');
+    root.innerHTML = '';
+
+    if (nodes.length === 0) {
+      root.innerHTML = '<text x="50%" y="50%" fill="#4a5568" text-anchor="middle" font-size="13">Sin entidades detectadas</text>';
+      return;
+    }
+
+    const svg = document.getElementById('graph-svg');
+    const W = svg.clientWidth  || 420;
+    const H = svg.clientHeight || 300;
+    const R = 28;
+
+    // Position nodes in a circle
+    const positions = {};
+    nodes.forEach((n, i) => {
+      const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+      const cx = W / 2 + (Math.min(W, H) / 2 - 60) * Math.cos(angle);
+      const cy = H / 2 + (Math.min(W, H) / 2 - 60) * Math.sin(angle);
+      positions[n.id] = { cx, cy };
+    });
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    // Draw edges first (under nodes)
+    edges.forEach(e => {
+      const from = positions[e.from];
+      const to   = positions[e.to];
+      if (!from || !to) return;
+
+      const dx = to.cx - from.cx;
+      const dy = to.cy - from.cy;
+      const len = Math.hypot(dx, dy) || 1;
+
+      // Shorten line to stop at node radius
+      const x1 = from.cx + dx / len * R;
+      const y1 = from.cy + dy / len * R;
+      const x2 = to.cx   - dx / len * (R + 8);
+      const y2 = to.cy   - dy / len * (R + 8);
+
+      const line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('class', 'edge-line');
+      root.appendChild(line);
+
+      const lx = (x1 + x2) / 2;
+      const ly = (y1 + y2) / 2 - 6;
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', lx); label.setAttribute('y', ly);
+      label.setAttribute('class', 'edge-label');
+      label.textContent = e.relation;
+      root.appendChild(label);
+    });
+
+    // Draw nodes on top
+    nodes.forEach(n => {
+      const { cx, cy } = positions[n.id];
+      const g = document.createElementNS(SVG_NS, 'g');
+
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+      circle.setAttribute('r', R);
+      circle.setAttribute('class', 'node-circle');
+      g.appendChild(circle);
+
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', cx); label.setAttribute('y', cy);
+      label.setAttribute('class', 'node-label');
+      label.textContent = n.id;
+      g.appendChild(label);
+
+      if (n.type_name) {
+        const sub = document.createElementNS(SVG_NS, 'text');
+        sub.setAttribute('x', cx); sub.setAttribute('y', cy + R + 14);
+        sub.setAttribute('class', 'edge-label');
+        sub.textContent = `[${n.type_name}]`;
+        g.appendChild(sub);
+      }
+
+      root.appendChild(g);
+    });
+  }
+
+  // ── Wire up editor ──────────────────────────────────────────────────────────
+  let debounceTimer;
+  document.getElementById('editor').addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runValidation, 250);
+  });
+
+  loadWasm();
+</script>
+</body>
+</html>
